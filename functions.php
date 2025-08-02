@@ -295,14 +295,14 @@ add_action( 'wp_footer', 'poshtik_custom_modal_script' );
 
 // Register custom roles on init
 function poshtik_add_custom_roles() {
-    add_role('pet_parent', 'Pet Parent', [
+    add_role('pet_parent', 'Pet Parent', array(
         'read' => true,
-    ]);
-    add_role('vet', 'Vet', [
+    ));
+    add_role('vet', 'Vet', array(
         'read' => true,
         'edit_pets' => true,
         'manage_appointments' => true,
-    ]);
+    ));
 }
 add_action('init', 'poshtik_add_custom_roles');
 
@@ -897,3 +897,336 @@ function vet_handle_get_all_data() {
     }
 }
 
+/**
+ * Add this to your functions.php file
+ * Appointments Dashboard Integration
+ */
+
+// Create database tables on theme activation
+function create_vet_appointment_tables() {
+    global $wpdb;
+    
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    // Main appointments table
+    $appointments_table = "CREATE TABLE {$wpdb->prefix}vet_appointments_enhanced (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        pet_id BIGINT,
+        pet_name VARCHAR(100) NOT NULL,
+        owner_id BIGINT,
+        owner_name VARCHAR(100) NOT NULL,
+        vet_id BIGINT,
+        vet_name VARCHAR(100),
+        appointment_date DATE NOT NULL,
+        appointment_time TIME NOT NULL,
+        duration INT DEFAULT 30,
+        appointment_type ENUM('checkup', 'vaccination', 'surgery', 'emergency', 'consultation') NOT NULL,
+        status ENUM('confirmed', 'completed', 'cancelled', 'rescheduled') DEFAULT 'confirmed',
+        is_urgent BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_by BIGINT,
+        
+        INDEX idx_date_time (appointment_date, appointment_time),
+        INDEX idx_pet_id (pet_id),
+        INDEX idx_status (status),
+        INDEX idx_vet_id (vet_id),
+        INDEX idx_date (appointment_date)
+    ) $charset_collate;";
+    
+    // History/audit log table
+    $history_table = "CREATE TABLE {$wpdb->prefix}vet_appointment_history (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        appointment_id BIGINT NOT NULL,
+        action_type ENUM('created', 'updated', 'completed', 'cancelled', 'rescheduled', 'deleted') NOT NULL,
+        user_id BIGINT NOT NULL,
+        user_name VARCHAR(100),
+        old_values JSON,
+        new_values JSON,
+        notes TEXT,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        
+        INDEX idx_appointment_id (appointment_id),
+        INDEX idx_action_type (action_type),
+        INDEX idx_created_at (created_at),
+        INDEX idx_user_id (user_id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($appointments_table);
+    dbDelta($history_table);
+    
+    // Insert sample data for testing
+    insert_sample_appointment_data();
+}
+
+// Insert sample data for testing
+function insert_sample_appointment_data() {
+    global $wpdb;
+    
+    $current_user = wp_get_current_user();
+    $today = date('Y-m-d');
+    $tomorrow = date('Y-m-d', strtotime('+1 day'));
+    
+    // Check if data already exists
+    $existing = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}vet_appointments_enhanced");
+    if ($existing > 0) return;
+    
+    $sample_appointments = array(
+        array(
+            'pet_name' => 'Buddy',
+            'owner_name' => 'John Smith',
+            'appointment_date' => $today,
+            'appointment_time' => '09:00:00',
+            'appointment_type' => 'checkup',
+            'vet_name' => $current_user->display_name,
+            'duration' => 30,
+            'status' => 'confirmed',
+            'notes' => 'Annual wellness exam',
+            'created_by' => $current_user->ID
+        ),
+        array(
+            'pet_name' => 'Luna',
+            'owner_name' => 'Emma Wilson',
+            'appointment_date' => $today,
+            'appointment_time' => '10:30:00',
+            'appointment_type' => 'vaccination',
+            'vet_name' => $current_user->display_name,
+            'duration' => 15,
+            'status' => 'completed',
+            'notes' => 'Rabies vaccination completed',
+            'created_by' => $current_user->ID
+        ),
+        array(
+            'pet_name' => 'Max',
+            'owner_name' => 'David Brown',
+            'appointment_date' => $tomorrow,
+            'appointment_time' => '14:00:00',
+            'appointment_type' => 'emergency',
+            'vet_name' => $current_user->display_name,
+            'duration' => 60,
+            'status' => 'confirmed',
+            'is_urgent' => true,
+            'notes' => 'Possible poisoning - urgent care needed',
+            'created_by' => $current_user->ID
+        )
+    );
+    
+    foreach ($sample_appointments as $appointment) {
+        $wpdb->insert($wpdb->prefix . 'vet_appointments_enhanced', $appointment);
+    }
+}
+
+// Run table creation on theme activation
+add_action('after_switch_theme', 'create_vet_appointment_tables');
+
+// Enqueue appointments assets
+function enqueue_appointments_assets() {
+    if (is_page_template('page-appointments.php')) {
+        // Enqueue CSS
+        wp_enqueue_style(
+            'appointments-css',
+            get_template_directory_uri() . '/assets/css/components/appointments.css',
+            array(),
+            filemtime(get_template_directory() . '/assets/css/components/appointments.css')
+        );
+        
+        // Enqueue JavaScript
+        wp_enqueue_script(
+            'appointments-js',
+            get_template_directory_uri() . '/assets/js/appointments.js',
+            array(),
+            filemtime(get_template_directory() . '/assets/js/appointments.js'),
+            true
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'enqueue_appointments_assets');
+
+// AJAX Handlers
+add_action('wp_ajax_get_appointments', 'handle_get_appointments');
+add_action('wp_ajax_create_appointment', 'handle_create_appointment');
+add_action('wp_ajax_update_appointment_status', 'handle_update_appointment_status');
+
+// Get appointments
+function handle_get_appointments() {
+    global $wpdb;
+    
+    // Verify nonce and capabilities
+    if (!wp_verify_nonce($_POST['nonce'], 'vet_appointments_nonce') || !current_user_can('edit_posts')) {
+        wp_die('Security check failed');
+    }
+    
+    $date = sanitize_text_field($_POST['date']);
+    $view = sanitize_text_field($_POST['view']);
+    
+    try {
+        if ($view === 'day') {
+            $appointments = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}vet_appointments_enhanced 
+                WHERE appointment_date = %s 
+                ORDER BY appointment_time ASC",
+                $date
+            ), ARRAY_A);
+        } else {
+            // For calendar view, get the whole month
+            $start_date = date('Y-m-01', strtotime($date));
+            $end_date = date('Y-m-t', strtotime($date));
+            
+            $appointments = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}vet_appointments_enhanced 
+                WHERE appointment_date BETWEEN %s AND %s 
+                ORDER BY appointment_date ASC, appointment_time ASC",
+                $start_date, $end_date
+            ), ARRAY_A);
+        }
+        
+        wp_send_json_success(array('appointments' => $appointments));
+        
+    } catch (Exception $e) {
+        wp_send_json_error('Database error: ' . $e->getMessage());
+    }
+}
+
+// Create appointment
+function handle_create_appointment() {
+    global $wpdb;
+    
+    // Verify nonce and capabilities
+    if (!wp_verify_nonce($_POST['nonce'], 'vet_appointments_nonce') || !current_user_can('edit_posts')) {
+        wp_die('Security check failed');
+    }
+    
+    $current_user = wp_get_current_user();
+    
+    $appointment_data = array(
+        'pet_name' => sanitize_text_field($_POST['pet_name']),
+        'owner_name' => sanitize_text_field($_POST['owner_name']),
+        'appointment_date' => sanitize_text_field($_POST['appointment_date']),
+        'appointment_time' => sanitize_text_field($_POST['appointment_time']),
+        'appointment_type' => sanitize_text_field($_POST['appointment_type']),
+        'duration' => intval($_POST['duration']),
+        'notes' => sanitize_textarea_field($_POST['notes']),
+        'is_urgent' => isset($_POST['is_urgent']) ? 1 : 0,
+        'vet_name' => $current_user->display_name,
+        'vet_id' => $current_user->ID,
+        'created_by' => $current_user->ID,
+        'status' => 'confirmed'
+    );
+    
+    // Validate required fields
+    if (empty($appointment_data['pet_name']) || empty($appointment_data['owner_name']) || 
+        empty($appointment_data['appointment_date']) || empty($appointment_data['appointment_time'])) {
+        wp_send_json_error('Missing required fields');
+        return;
+    }
+    
+    // Check for time conflicts
+    $conflict = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}vet_appointments_enhanced 
+        WHERE appointment_date = %s 
+        AND appointment_time = %s 
+        AND status IN ('confirmed', 'rescheduled')",
+        $appointment_data['appointment_date'],
+        $appointment_data['appointment_time']
+    ));
+    
+    if ($conflict) {
+        wp_send_json_error('Time slot already booked');
+        return;
+    }
+    
+    $result = $wpdb->insert($wpdb->prefix . 'vet_appointments_enhanced', $appointment_data);
+    
+    if ($result) {
+        $appointment_id = $wpdb->insert_id;
+        
+        // Log the action
+        log_appointment_action($appointment_id, 'created', null, $appointment_data);
+        
+        wp_send_json_success(array('id' => $appointment_id, 'message' => 'Appointment created successfully'));
+    } else {
+        wp_send_json_error('Failed to create appointment');
+    }
+}
+
+// Update appointment status
+function handle_update_appointment_status() {
+    global $wpdb;
+    
+    // Verify nonce and capabilities
+    if (!wp_verify_nonce($_POST['nonce'], 'vet_appointments_nonce') || !current_user_can('edit_posts')) {
+        wp_die('Security check failed');
+    }
+    
+    $appointment_id = intval($_POST['appointment_id']);
+    $new_status = sanitize_text_field($_POST['status']);
+    
+    // Get old appointment data
+    $old_appointment = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}vet_appointments_enhanced WHERE id = %d",
+        $appointment_id
+    ), ARRAY_A);
+    
+    if (!$old_appointment) {
+        wp_send_json_error('Appointment not found');
+        return;
+    }
+    
+    $result = $wpdb->update(
+        $wpdb->prefix . 'vet_appointments_enhanced',
+        array('status' => $new_status),
+        array('id' => $appointment_id)
+    );
+    
+    if ($result !== false) {
+        // Log the action
+        log_appointment_action(
+            $appointment_id, 
+            $new_status, 
+            array('status' => $old_appointment['status']), 
+            array('status' => $new_status)
+        );
+        
+        wp_send_json_success(array('message' => 'Appointment status updated'));
+    } else {
+        wp_send_json_error('Failed to update appointment');
+    }
+}
+
+// Log appointment actions
+function log_appointment_action($appointment_id, $action, $old_values = null, $new_values = null) {
+    global $wpdb;
+    
+    $current_user = wp_get_current_user();
+    
+    $log_data = array(
+        'appointment_id' => $appointment_id,
+        'action_type' => $action,
+        'user_id' => $current_user->ID,
+        'user_name' => $current_user->display_name,
+        'old_values' => $old_values ? json_encode($old_values) : null,
+        'new_values' => $new_values ? json_encode($new_values) : null,
+        'notes' => "Action performed by {$current_user->display_name}",
+        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
+        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? ''
+    );
+    
+    $wpdb->insert($wpdb->prefix . 'vet_appointment_history', $log_data);
+}
+
+// Add custom rewrite rule for appointments page
+function add_appointments_rewrite_rule() {
+    add_rewrite_rule('^appointments/?', 'index.php?pagename=appointments', 'top');
+}
+add_action('init', 'add_appointments_rewrite_rule');
+
+// Flush rewrite rules on theme activation
+function flush_appointments_rewrites() {
+    add_appointments_rewrite_rule();
+    flush_rewrite_rules();
+}
+add_action('after_switch_theme', 'flush_appointments_rewrites');
