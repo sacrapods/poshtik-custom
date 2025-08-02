@@ -1,0 +1,33 @@
+/* Pet Profile: File Preview Modal Styles */
+#file-modal {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 1000;
+}
+#file-modal:not(.hidden) {
+  display: flex;
+}
+.modal-content {
+  position: relative;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  max-width: 90%;
+  max-height: 90%;
+  overflow: auto;
+}
+.modal-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.pet-file-thumb img {
+  cursor: pointer;
+}

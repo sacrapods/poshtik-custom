@@ -1,0 +1,12 @@
+# OS junk
+.DS_Store
+
+# Logs
+*.log
+
+# Build artifacts (if using npm/composer)
+node_modules/
+vendor/
+
+# Optional: ignore local config files
+*.env
