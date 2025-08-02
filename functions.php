@@ -151,14 +151,42 @@ function poshtik_custom_scripts() {
 	  true
 	);
 
-	// Enqueue Vet Dashboard CSS and JS only on Vet Dashboard template
+	// NEW CSS ORGANIZATION - Enqueue organized dashboard styles
 	if ( is_page_template( 'page-vet-dashboard.php' ) ) {
+		// Core dashboard layout
 		wp_enqueue_style(
-		  'poshtik-dashboard-style',
-		  get_template_directory_uri() . '/dashboard.css',
+		  'dashboard-layout',
+		  get_template_directory_uri() . '/assets/css/layouts/dashboard.css',
 		  array(),
 		  _S_VERSION
 		);
+		
+		// Sidebar component
+		wp_enqueue_style(
+		  'sidebar-component',
+		  get_template_directory_uri() . '/assets/css/components/sidebar.css',
+		  array('dashboard-layout'),
+		  _S_VERSION
+		);
+		
+		// Pet overview component
+		wp_enqueue_style(
+		  'pet-overview-component',
+		  get_template_directory_uri() . '/assets/css/components/pet-overview.css',
+		  array('dashboard-layout'),
+		  _S_VERSION
+		);
+		
+		// Mobile responsive styles
+		wp_enqueue_style(
+		  'dashboard-mobile',
+		  get_template_directory_uri() . '/assets/css/layouts/mobile.css',
+		  array('dashboard-layout'),
+		  _S_VERSION,
+		  'screen and (max-width: 768px)'
+		);
+		
+		// Dashboard JavaScript
 		wp_enqueue_script(
 		  'poshtik-dashboard-script',
 		  get_template_directory_uri() . '/js/dashboard.js',
@@ -166,7 +194,8 @@ function poshtik_custom_scripts() {
 		  _S_VERSION,
 		  true
 		);
-		// Provide AJAX URL to Vet Dashboard script
+		
+		// Provide AJAX URL to dashboard script
 		wp_add_inline_script(
 		  'poshtik-dashboard-script',
 		  'var ajaxurl = "' . esc_url( admin_url( 'admin-ajax.php' ) ) . '";'

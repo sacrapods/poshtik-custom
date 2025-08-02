@@ -1,0 +1,202 @@
+/* Mobile Responsive Styles */
+
+@media (max-width: 768px) {
+  .vet-dashboard {
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+  }
+  
+  .dashboard-sidebar {
+    width: 100%;
+    height: auto;
+  }
+  
+  .dashboard-tabs {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 1rem;
+  }
+  
+  .tab-button {
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .dashboard-panel {
+    padding: 1rem;
+  }
+  
+  .pet-overview {
+    padding: 1.5rem;
+  }
+  
+  .pet-details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .action-btn {
+    text-align: center;
+  }
+  
+  /* Sidebar adjustments for mobile */
+  .sidebar-welcome {
+    padding: 0.75rem;
+  }
+  
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+  
+  .pet-quick-item {
+    padding: 0.75rem;
+  }
+  
+  .pet-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  /* Header adjustments */
+  .vet-dashboard-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .vet-dashboard-header h1 {
+    font-size: 1.25rem;
+  }
+  
+  /* Pet header card mobile */
+  .pet-header-card {
+    padding: 1rem;
+  }
+  
+  .pet-header-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .pet-photo,
+  .pet-avatar-fallback {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+  }
+  
+  .pet-title {
+    font-size: 1.5rem;
+  }
+  
+  .pet-meta {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .info-card {
+    padding: 1rem;
+  }
+  
+  /* Touch-friendly buttons */
+  .dashboard-home-toggle,
+  .dashboard-pets-toggle,
+  .nav-item {
+    padding: 1rem;
+    font-size: 0.95rem;
+  }
+  
+  .tab-button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .vet-dashboard {
+    padding: 0.5rem;
+  }
+  
+  .dashboard-panel {
+    padding: 0.75rem;
+  }
+  
+  .pet-header-card {
+    padding: 0.75rem;
+  }
+  
+  .quick-actions {
+    gap: 0.5rem;
+  }
+  
+  .action-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .dashboard-tabs {
+    padding: 0.75rem;
+  }
+  
+  .tab-button {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8rem;
+  }
+  
+  /* Sidebar mobile adjustments */
+  .dashboard-sidebar {
+    padding: 1rem;
+  }
+  
+  .sidebar-welcome {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .vet-dashboard {
+    height: calc(100vh - 60px);
+  }
+  
+  .vet-dashboard-header {
+    padding: 0.5rem 1rem;
+  }
+  
+  .dashboard-sidebar {
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .tab-button,
+  .action-btn,
+  .nav-item,
+  .pet-quick-item {
+    min-height: 44px;
+  }
+  
+  .tab-button:hover,
+  .action-btn:hover,
+  .nav-item:hover,
+  .pet-quick-item:hover {
+    transform: none;
+  }
+  
+  .tab-button:active,
+  .action-btn:active,
+  .nav-item:active,
+  .pet-quick-item:active {
+    background: rgba(102, 126, 234, 0.2);
+    transform: scale(0.98);
+  }
+}
